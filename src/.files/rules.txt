@@ -1,0 +1,43 @@
+5-CARD DRAW POKER RULES
+-----------------------
+
+OBJECTIVE:
+The goal is to win the pot by having the best 5-card hand or by 
+persuading all other players to fold.
+
+THE SETUP:
+1. A standard 52-card deck is used.
+2. Players contribute an "Ante" (a small starting bet) into the pot.
+
+THE DEAL:
+1. Each player is dealt 5 cards face down, one at a time.
+2. Players look at their cards without showing others.
+
+FIRST BETTING ROUND:
+1. Starting to the left of the dealer, players may:
+   - CHECK: Pass the action to the next player (if no bet is made).
+   - BET: Place a wager.
+   - CALL: Match a previous player's bet.
+   - RAISE: Increase the current bet.
+   - FOLD: Discard your hand and leave the round.
+
+THE DRAW:
+1. After betting, players may discard up to 3 cards (4 if the 5th 
+   card is an Ace).
+2. The dealer replaces the discarded cards with new ones from the deck.
+3. You may "stand pat" (keep all 5 original cards) if you wish.
+
+SECOND BETTING ROUND:
+1. A final round of betting occurs, starting with the first 
+   active player to the left of the dealer.
+
+THE SHOWDOWN:
+1. If more than one player remains, they reveal their cards.
+2. The player with the highest-ranking 5-card hand wins the pot.
+3. In case of a tie, the pot is split equally.
+
+TIE-BREAKING:
+- If hands are of the same rank (e.g., both have a Pair), the 
+  highest pair wins.
+- If pairs are identical, the highest "Kicker" (the highest 
+  unmatched card) determines the winner.

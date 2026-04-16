@@ -1,0 +1,1 @@
+g++ main.cpp miniaudio.c -o Poker-sim.exe -lwinmm -lole32

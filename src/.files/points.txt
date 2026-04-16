@@ -1,0 +1,33 @@
+POKER HAND RANKINGS (Highest to Lowest)
+---------------------------------------
+
+1. ROYAL FLUSH
+   A, K, Q, J, 10 of the same suit.
+
+2. STRAIGHT FLUSH
+   Five cards in sequence, all of the same suit.
+
+3. FOUR OF A KIND
+   Four cards of the same rank (e.g., four Jacks).
+
+4. FULL HOUSE
+   Three of a kind combined with a pair (e.g., three 8s and two 5s).
+
+5. FLUSH
+   Any five cards of the same suit, not in sequence.
+
+6. STRAIGHT
+   Five cards in sequence, but not of the same suit.
+
+7. THREE OF A KIND
+   Three cards of the same rank.
+
+8. TWO PAIR
+   Two different pairs (e.g., two 10s and two 4s).
+
+9. ONE PAIR
+   Two cards of the same rank.
+
+10. HIGH CARD
+    When no player has any of the above, the highest card wins.
+    (Ace is high, 2 is low).
