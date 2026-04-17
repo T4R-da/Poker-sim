@@ -15,11 +15,12 @@ void printHand(const std::vector<Card>& hand, const std::vector<bool>& discard =
     }
 }
 
-void playerDrawPhase(std::vector<Card>& hand, Deck& deck) {
+void playerDrawPhase(std::vector<Card>& hand, Deck& deck, int currentTurn, int totalTurns) {
     std::vector<bool> discard(5, false);
     while (true) {
         clearScreen();
         printHeader();
+        std::cout << CYAN << BOLD << "TURN " << currentTurn << " OF " << totalTurns << RESET << "\n";
         std::cout << YELLOW << "POT: $" << currentBet << " | BAL: $" << playerBalance - currentBet << RESET << "\n\n";
         std::cout << BOLD << "YOUR HAND:\n" << RESET;
         printHand(hand, discard);
@@ -39,78 +40,81 @@ void playerDrawPhase(std::vector<Card>& hand, Deck& deck) {
 
 void playGame(ma_engine* pMainEngine) {
     clearScreen(); printHeader();
-    placeBet();
-    chooseOpponents(); // New function replaces numcards()
-
-    Deck myDeck;
-    myDeck.shuffleDeck();
-
-    std::vector<Card> pHand;
-    std::vector<std::vector<Card>> cpuHands(numCPUs);
-
-    // Deal
-    for (int i = 0; i < 5; i++) {
-        pHand.push_back(myDeck.drawCard());
-        for (int j = 0; j < numCPUs; j++) {
-            cpuHands[j].push_back(myDeck.drawCard());
-        }
-    }
-
-    playerDrawPhase(pHand, myDeck);
-
-    // CPU Draw Phases
-    for (int j = 0; j < numCPUs; j++) {
-        std::vector<bool> cDiscard = cpuDecide1(cpuHands[j]);
-        for (int i = 0; i < 5; i++) if (cDiscard[i]) cpuHands[j][i] = myDeck.drawCard();
-    }
-
-    HandResult pRes = evaluateHand(pHand);
     
-    clearScreen(); printHeader();
-    std::cout << RED << BOLD << "\n*** SHOWDOWN ***" << RESET << "\n\n";
-    std::cout << "YOUR HAND: "; printHand(pHand);
-    std::cout << " >> " << CYAN << pRes.name << RESET << "\n\n";
+    int totalTurns;
+    std::cout << CYAN << "How many turns do you want to play? (1-5): " << RESET;
+    while (!(std::cin >> totalTurns) || totalTurns < 1 || totalTurns > 5) {
+        std::cin.clear(); std::cin.ignore(1000, '\n');
+        std::cout << RED << "Invalid. Please enter 1-5: " << RESET;
+    }
+    
+    chooseOpponents();
 
-    int highestCpuScore = 0;
-    int winnerIdx = -1;
+    for (int t = 1; t <= totalTurns; t++) {
+        placeBet();
+        Deck myDeck;
+        myDeck.shuffleDeck();
 
-    for (int j = 0; j < numCPUs; j++) {
-        HandResult cRes = evaluateHand(cpuHands[j]);
-        std::cout << "CPU " << (j + 1) << " HAND: "; printHand(cpuHands[j]);
-        std::cout << " >> " << CYAN << cRes.name << RESET << "\n";
+        std::vector<Card> pHand;
+        std::vector<std::vector<Card>> cpuHands(numCPUs);
+
+        for (int i = 0; i < 5; i++) {
+            pHand.push_back(myDeck.drawCard());
+            for (int j = 0; j < numCPUs; j++) cpuHands[j].push_back(myDeck.drawCard());
+        }
+
+        playerDrawPhase(pHand, myDeck, t, totalTurns);
+
+        for (int j = 0; j < numCPUs; j++) {
+            std::vector<bool> cDiscard = cpuDecide1(cpuHands[j]);
+            for (int i = 0; i < 5; i++) if (cDiscard[i]) cpuHands[j][i] = myDeck.drawCard();
+        }
+
+        HandResult pRes = evaluateHand(pHand);
+        clearScreen(); printHeader();
+        std::cout << RED << BOLD << "\n*** SHOWDOWN (TURN " << t << ") ***" << RESET << "\n\n";
+        std::cout << "YOUR HAND: "; printHand(pHand);
+        std::cout << " >> " << CYAN << pRes.name << RESET << "\n\n";
+
+        int highestCpuScore = 0;
+        int winnerIdx = -1;
+
+        for (int j = 0; j < numCPUs; j++) {
+            HandResult cRes = evaluateHand(cpuHands[j]);
+            std::cout << "CPU " << (j + 1) << " HAND: "; printHand(cpuHands[j]);
+            std::cout << " >> " << CYAN << cRes.name << RESET << "\n";
+            if (cRes.totalScore > highestCpuScore) { highestCpuScore = cRes.totalScore; winnerIdx = j; }
+        }
+
+        if (pRes.totalScore > highestCpuScore) {
+            int win = currentBet * static_cast<int>(pRes.value);
+            playerBalance += win;
+            std::cout << GREEN << BOLD << "\n>> TURN " << t << ": YOU WIN $" << win << "! <<" << RESET << "\n";
+            ma_engine_stop(pMainEngine);
+            ma_engine eng; ma_engine_init(NULL, &eng);
+            ma_engine_play_sound(&eng, "jackpot.wav", NULL);
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            ma_engine_uninit(&eng);
+            ma_engine_start(pMainEngine);
+        } else if (highestCpuScore > pRes.totalScore) {
+            playerBalance -= currentBet;
+            std::cout << RED << BOLD << "\n>> TURN " << t << ": CPU " << (winnerIdx + 1) << " WINS! YOU LOST $" << currentBet << " <<" << RESET << "\n";
+            ma_engine_stop(pMainEngine);
+            ma_engine eng; ma_engine_init(NULL, &eng);
+            ma_engine_play_sound(&eng, "fart.wav", NULL);
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            ma_engine_uninit(&eng);
+            ma_engine_start(pMainEngine);
+        } else {
+            std::cout << YELLOW << BOLD << "\n>> TURN " << t << ": DRAW! <<" << RESET << "\n";
+        }
         
-        if (cRes.totalScore > highestCpuScore) {
-            highestCpuScore = cRes.totalScore;
-            winnerIdx = j;
+        if (t < totalTurns) {
+            std::cout << CYAN << "\nPrepare for Turn " << (t + 1) << "..." << RESET << "\n";
+            std::this_thread::sleep_for(std::chrono::seconds(2));
         }
     }
-
-    std::cout << "\n-----------------------------------------------------\n";
-
-    if (pRes.totalScore > highestCpuScore) {
-        int win = currentBet * static_cast<int>(pRes.value);
-        playerBalance += win;
-        std::cout << GREEN << BOLD << ">> YOU WIN! YOU BEAT ALL CPUS. WINNINGS: $" << win << " <<" << RESET << "\n";
-        
-        ma_engine_stop(pMainEngine);
-        ma_engine engWin; ma_engine_init(NULL, &engWin);
-        ma_engine_play_sound(&engWin, "jackpot.wav", NULL);
-        std::this_thread::sleep_for(std::chrono::seconds(3));
-        ma_engine_uninit(&engWin);
-        ma_engine_start(pMainEngine);
-    } else if (highestCpuScore > pRes.totalScore) {
-        playerBalance -= currentBet;
-        std::cout << RED << BOLD << ">> CPU " << (winnerIdx + 1) << " WINS! YOU LOST $" << currentBet << " <<" << RESET << "\n";
-        
-        ma_engine_stop(pMainEngine);
-        ma_engine engLose; ma_engine_init(NULL, &engLose);
-        ma_engine_play_sound(&engLose, "fart.wav", NULL);
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-        ma_engine_uninit(&engLose);
-        ma_engine_start(pMainEngine);
-    } else {
-        std::cout << YELLOW << BOLD << ">> DRAW! POT RETURNED <<" << RESET << "\n";
-    }
+    std::cout << MAGENTA << BOLD << "\nALL TURNS COMPLETE. FINAL BALANCE: $" << playerBalance << RESET << "\n";
     waitForEnter();
 }
 
@@ -121,7 +125,7 @@ int main() {
     ma_engine_play_sound(&engine1, "sound.wav", NULL);
 
     int choice = 0;
-    std::string options[] = { "Start Game", "Rules", "Hand Rankings", "Quit" };
+    std::string options[] = { "Start Game session", "Rules", "Hand Rankings", "Quit" };
 
     while (true) {
         clearScreen();

@@ -22,7 +22,6 @@
 #define GREEN   "\033[32m"
 #define MAGENTA "\033[35m"
 
-// --- GLOBAL ECONOMY & SETTINGS ---
 inline int playerBalance = 1000;
 inline int currentBet = 0;
 inline int startingRank = 2; 
@@ -58,12 +57,12 @@ struct Card {
 // --- VISUALS (ASCII ART) ---
 inline void printHeader() {
     std::cout << MAGENTA << BOLD;
-    std::cout << "  ____      ____    _    ____  ____   ____       ____   ___   _  __ _____ ____  \n";
-    std::cout << " | ___|    / ___|  / \\  |  _ \\|  _ \\ / ___|     |  _ \\ / _ \\ | |/ /| ____|  _ \\ \n";
-    std::cout << " |___ \\   | |     / _ \\ | |_) | | | |\\___ \\     | |_) | | | || ' / |  _| | |_) |\n";
-    std::cout << "  ___) |  | |___ / ___ \\|  _ <| |_| | ___) |    |  __/| |_| || . \\ | |___|  _ < \n";
-    std::cout << " |____/    \\____/_/   \\_\\_| \\_\\____/ |____/     |_|    \\___/ |_|\\_\\|_____|_| \\_\\\n";
-    std::cout << "=================================================================================\n" << RESET;
+    std::cout << "  ____     ____    _    ____  ____   ____      ____   ___   _  __ _____ ____  \n";
+    std::cout << " | ___|   / ___|  / \\  |  _ \\|  _ \\ / ___|    |  _ \\ / _ \\ | |/ /| ____|  _ \\ \n";
+    std::cout << " |___ \\  | |     / _ \\ | |_) | | | |\\___ \\    | |_) | | | || ' / |  _| | |_) |\n";
+    std::cout << "  ___) | | |___ / ___ \\|  _ <| |_| | ___) |   |  __/| |_| || . \\ | |___|  _ < \n";
+    std::cout << " |____/   \\____/_/   \\_\\_| \\_\\____/ |____/    |_|    \\___/ |_|\\_\\|_____|_| \\_\\\n";
+    std::cout << "==================================================================================\n" << RESET;
 }
 
 inline void clearScreen() { system("cls"); }
@@ -74,24 +73,20 @@ inline void bootingSequence() {
     std::cout << "[";
     for(int i=0; i<30; i++) {
         std::cout << "#";
-        std::this_thread::sleep_for(std::chrono::milliseconds(40));
+        std::this_thread::sleep_for(std::chrono::milliseconds(30));
     }
     std::cout << "] 100%\n";
-    std::cout << GREEN << "AUDIO AND CARDS LOADED SUCCESSFULLY." << RESET << "\n";
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::cout << GREEN << "ASSETS LOADED." << RESET << "\n";
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 }
 
-// --- LOGIC ---
 inline void chooseOpponents() {
     std::cout << CYAN << "\nHow many CPUs do you want to play against? (1-7): " << RESET;
     while (!(std::cin >> numCPUs) || numCPUs < 1 || numCPUs > 7) {
         std::cin.clear(); std::cin.ignore(1000, '\n');
         std::cout << RED << "Select 1 to 7: " << RESET;
     }
-    // Logic: 1 CPU = Rank 8, 7 CPUs = Rank 2
     startingRank = 9 - numCPUs;
-    std::cout << YELLOW << "Deck adjusted. Starting card rank: " << startingRank << RESET << "\n";
-    std::this_thread::sleep_for(std::chrono::seconds(1));
     std::cin.ignore(1000, '\n');
 }
 
@@ -131,9 +126,7 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
     if (ranks[4] == 14 && ranks[0] == 2 && ranks[1] == 3 && ranks[2] == 4 && ranks[3] == 5) { isStraight = true; sHigh = 5; }
     int quads = 0, trips = 0, pairs = 0;
     for (auto const& [r, count] : rc) {
-        if (count == 4) quads++;
-        else if (count == 3) trips++;
-        else if (count == 2) pairs++;
+        if (count == 4) quads++; else if (count == 3) trips++; else if (count == 2) pairs++;
     }
     HandValue v = HIGH_CARD;
     if (isFlush && isStraight && sHigh == 14) v = ROYAL_FLUSH;
