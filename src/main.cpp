@@ -287,8 +287,8 @@ void playGame(ma_engine* pMainEngine) {
         ma_engine_stop(pMainEngine);
         ma_engine eng; 
         ma_engine_init(NULL, &eng);
-        ma_engine_play_sound(&eng, (winner == 0) ? "jackpot.wav" : "fart.wav", NULL);
-        sleepMs(2000);
+        ma_engine_play_sound(&eng, (winner == 0) ? "win.wav" : "loss.wav", NULL);
+        sleepMs(4000);
         ma_engine_uninit(&eng);
         ma_engine_start(pMainEngine);
         
