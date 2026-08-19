@@ -1,18 +1,18 @@
-# 🃏 5-Card Draw Poker Engine
+# 5-Card Draw Poker Engine (Linux Port)
 
-A terminal-based 5-Card Draw Poker game written in C++ for Windows. Built on top of the Texas Hold'em engine, this version introduces a full draw phase, a CPU AI opponent, and the same economy/audio system you already know.
+A terminal-based 5-Card Draw Poker game written in C++ for Linux. Built on top of a Texas Hold'em engine, this version introduces a full draw phase, a CPU AI opponent, and the same economy/audio system you already know, now fully portable to any POSIX system.
 
 ---
 
 ## Features
 
-- **Full 5-Card Draw flow** — opening deal → hold/discard phase → CPU draw → showdown
-- **Interactive hold system** — toggle cards to keep by number, with live `HOLD` indicators in the terminal
-- **CPU AI opponent** — holds pairs or better, flushes draws, and falls back to highest card
-- **Economy system** — persistent balance across rounds, charity mode when broke
-- **Multiplied payouts** — winnings scale with hand strength (1× for a pair up to 10× for a Royal Flush)
-- **Audio hooks** — background music, jackpot sound on win, fart sound on loss (via `miniaudio`)
-- **ANSI color UI** — colored cards, bold headers, arrow-key menu navigation
+- Full 5-Card Draw flow — opening deal → hold/discard phase → CPU draw → showdown
+- Interactive hold system — toggle cards to keep by number, with live HOLD indicators in the terminal
+- CPU AI opponent — holds pairs or better, flush draws, and falls back to highest card
+- Economy system — persistent balance across rounds, charity mode when broke
+- Multiplied payouts — winnings scale with hand strength (1x for a pair up to 10x for a Royal Flush)
+- Audio hooks — background music, jackpot sound on win, fart sound on loss (via miniaudio)
+- ANSI color UI — colored cards, bold headers, arrow-key menu navigation
 
 ---
 
@@ -37,44 +37,37 @@ A terminal-based 5-Card Draw Poker game written in C++ for Windows. Built on top
 
 | Requirement | Notes |
 |---|---|
-| Windows | Uses `<conio.h>`, `_getch()`, `system("cls")` |
-| C++17 or later | Uses `std::set`, structured bindings, inline globals |
-| A C++ compiler | MSVC, MinGW/GCC, or Clang on Windows |
-| `miniaudio.h` | Single-header, no install needed — just drop it in |
+| Linux (or any POSIX system) | Uses termios, ANSI escape sequences, POSIX threads |
+| C++17 or later | Uses std::set, structured bindings, inline globals |
+| A C++ compiler | GCC or Clang (tested with g++ 9+) |
+| miniaudio.h | Single-header, no install needed — just drop it in |
+| Optional: sound files | WAV, MP3, or FLAC supported via miniaudio |
 
 ---
 
 ## Building
 
-### With MinGW (GCC)
+With GCC (or Clang):
 
 ```bash
-g++ main5card.cpp -o poker5card.exe -std=c++17 -O2
+g++ -std=c++17 main5card.cpp -o poker5card -O2 -lpthread -ldl
 ```
 
-### With MSVC (Developer Command Prompt)
-
-```bash
-cl main5card.cpp /std:c++17 /O2 /Fe:poker5card.exe
-```
-
-> **Note:** `miniaudio.h` is a single-header library. No extra linking is required beyond the standard runtime.
+No special linking is required beyond `-lpthread` and `-ldl` for miniaudio.
 
 ---
 
 ## How to Play
 
-```
-1. Launch poker5card.exe
-2. Navigate the menu with ↑ / ↓ arrow keys, confirm with ENTER
+1. Launch `./poker5card`
+2. Navigate the menu with up/down arrow keys, confirm with ENTER
 3. Enter your bet when prompted
 4. You are dealt 5 cards
-5. Type the numbers of cards you want to HOLD (e.g. 1 3 5), then press ENTER
+5. Type the numbers of cards you want to HOLD (e.g. `1 3 5`), then press ENTER
    - You can toggle cards on/off multiple times before confirming
    - Press ENTER on an empty line to confirm your selection and draw
 6. The CPU draws its replacement cards
 7. Hands are revealed and compared — best hand wins
-```
 
 ---
 
@@ -82,16 +75,16 @@ cl main5card.cpp /std:c++17 /O2 /Fe:poker5card.exe
 
 | Hand | Multiplier |
 |---|---|
-| High Card | 1× |
-| One Pair | 2× |
-| Two Pair | 3× |
-| Three of a Kind | 4× |
-| Straight | 5× |
-| Flush | 6× |
-| Full House | 7× |
-| Four of a Kind | 8× |
-| Straight Flush | 9× |
-| Royal Flush | 10× |
+| High Card | 1x |
+| One Pair | 2x |
+| Two Pair | 3x |
+| Three of a Kind | 4x |
+| Straight | 5x |
+| Flush | 6x |
+| Full House | 7x |
+| Four of a Kind | 8x |
+| Straight Flush | 9x |
+| Royal Flush | 10x |
 
 Winnings are calculated as `bet × hand multiplier`. On a loss, you forfeit the bet. On a draw, the bet is returned.
 
@@ -101,9 +94,9 @@ Winnings are calculated as `bet × hand multiplier`. On a loss, you forfeit the 
 
 The CPU uses a simple rule-based strategy:
 
-1. **Holds any cards that are part of a pair or better** (pairs, trips, quads, full houses)
-2. **Holds the highest card** if no pairs are found
-3. **Prefers flush draws** (3+ cards of the same suit) when nothing else qualifies
+1. Holds any cards that are part of a pair or better (pairs, trips, quads, full houses)
+2. Holds the highest card if no pairs are found
+3. Prefers flush draws (3+ cards of the same suit) when nothing else qualifies
 4. Discards everything else and draws replacements
 
 This is intentionally beatable — it doesn't bluff, and it doesn't evaluate straight draws.
@@ -125,15 +118,24 @@ This is intentionally beatable — it doesn't bluff, and it doesn't evaluate str
 
 ## Customising
 
-**Starting balance** — edit `inline int playerBalance = 1000;` in `functions5card.hpp`.
+- **Starting balance** — edit `inline int playerBalance = 1000;` in `functions5card.hpp`.
+- **Charity amount** — when broke, the player receives $200 by default. Change the value in `placeBet()`.
+- **CPU difficulty** — the `cpuDecide()` function in `functions5card.hpp` returns a `vector<bool>` of which cards to keep. You can extend it with straight-draw detection or probabilistic bluffing.
+- **Sound files** — replace `sound.wav`, `jackpot.wav`, and `fart.wav` with any WAV/MP3/FLAC files. miniaudio supports them with no extra dependencies.
+- **Rules / rankings text** — edit `.files/rules.txt` and `.files/points.txt` to change what's shown in the menu.
 
-**Charity amount** — when broke, the player receives $200 by default. Change the value in `placeBet()`.
+---
 
-**CPU difficulty** — the `cpuDecide()` function in `functions5card.hpp` returns a `vector<bool>` of which cards to keep. You can extend it with straight-draw detection or probabilistic bluffing.
+## Porting Notes (from Windows)
 
-**Sound files** — replace `sound.wav`, `jackpot.wav`, and `fart.wav` with any WAV files. miniaudio supports WAV, MP3, and FLAC with no extra dependencies.
+The original Windows version used `<conio.h>`, `_getch()`, and `system("cls")`.  
+This Linux port replaces them with:
 
-**Rules / rankings text** — edit `.files/rules.txt` and `.files/points.txt` to change what's shown in the menu.
+- `termios` for raw input (single-key reads, arrow keys)
+- ANSI escape sequences (`\033[2J\033[H`) for screen clearing
+- POSIX threads and dynamic linking for miniaudio
+
+All Windows‑specific headers have been removed, and the game now runs natively on Linux.
 
 ---
 

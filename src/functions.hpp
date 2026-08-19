@@ -9,10 +9,11 @@
 #include <fstream>
 #include <thread>
 #include <chrono>
-#include <conio.h>
 #include <map>
 #include <set>
 #include <cstdlib>
+#include <termios.h>
+#include <unistd.h>
 
 // ANSI Colors
 #define RESET   "\033[0m"
@@ -56,7 +57,7 @@ struct Card {
     }
 };
 
-// Forward declaration - fixes "evaluateHand was not declared in this scope"
+// Forward declaration
 HandResult evaluateHand(const std::vector<Card>& hand);
 
 // --- TIMING UTILS ---
@@ -116,7 +117,9 @@ inline void printHeader() {
     std::cout << "==================================================================================\n" << RESET;
 }
 
-inline void clearScreen() { system("cls"); }
+inline void clearScreen() {
+    std::cout << "\033[2J\033[H";
+}
 
 inline void bootingSequence() {
     clearScreen();
@@ -159,7 +162,6 @@ inline void chooseOpponents() {
         std::cin.clear(); std::cin.ignore(1000, '\n');
         std::cout << RED << "Select 1 to 4: " << RESET;
     }
-    // 1 CPU = start from 9, 2 CPUs = start from 8, etc.
     startingRank = 10 - numCPUs;
     std::cin.ignore(1000, '\n');
 }
@@ -184,17 +186,15 @@ inline void placeBet() {
     }
 }
 
-// --- HAND EVALUATION (FIXED: Proper scoring to avoid ties) ---
+// --- HAND EVALUATION ---
 inline HandResult evaluateHand(const std::vector<Card>& hand) {
     std::vector<Card> h = hand;
-    // Sort descending (high to low)
     std::sort(h.begin(), h.end(), [](const Card& a, const Card& b){ return a.rank > b.rank; });
     
     std::map<Rank, int> rc;
     std::map<Symbol, int> sc;
     for (const auto& c : h) { rc[c.rank]++; sc[c.symbol]++; }
     
-    // Check flush
     bool isFlush = false;
     Symbol flushSuit;
     for (auto const& [suit, cnt] : sc) {
@@ -205,7 +205,6 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
         }
     }
     
-    // Get flush cards sorted descending
     std::vector<int> flushRanks;
     if (isFlush) {
         for (const auto& c : h) {
@@ -216,7 +215,6 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
         std::sort(flushRanks.rbegin(), flushRanks.rend());
     }
     
-    // Check straight (using unique ranks)
     std::set<int> uniqueRanksSet;
     for (const auto& c : h) uniqueRanksSet.insert(static_cast<int>(c.rank));
     std::vector<int> uniqueRanks(uniqueRanksSet.rbegin(), uniqueRanksSet.rend());
@@ -224,7 +222,6 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
     bool isStraight = false;
     int straightHigh = 0;
     
-    // Check for 5 consecutive cards
     for (size_t i = 0; i + 4 < uniqueRanks.size(); ++i) {
         if (uniqueRanks[i] - uniqueRanks[i+4] == 4) {
             isStraight = true;
@@ -233,14 +230,12 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
         }
     }
     
-    // Check ace-low straight (A-5-4-3-2)
     if (!isStraight && uniqueRanksSet.count(14) && uniqueRanksSet.count(5) && 
         uniqueRanksSet.count(4) && uniqueRanksSet.count(3) && uniqueRanksSet.count(2)) {
         isStraight = true;
-        straightHigh = 5; // Ace is low
+        straightHigh = 5;
     }
     
-    // Count frequencies
     int quads = 0, trips = 0, pairs = 0;
     int quadRank = 0, tripRank = 0, pair1Rank = 0, pair2Rank = 0;
     std::vector<int> kickers;
@@ -262,13 +257,12 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
             kickers.push_back(rankVal);
         }
     }
-    std::sort(kickers.rbegin(), kickers.rend()); // Descending
+    std::sort(kickers.rbegin(), kickers.rend());
     
     HandValue v = HIGH_CARD;
     int score = 0;
-    const int BASE = 100000000; // 10^8 - ensures categories don't overlap
+    const int BASE = 100000000; // 10^8
     
-    // Royal Flush check (10-J-Q-K-A of same suit)
     bool isRoyal = (isFlush && isStraight && straightHigh == 14 && 
                     uniqueRanksSet.count(13) && uniqueRanksSet.count(12) && 
                     uniqueRanksSet.count(11) && uniqueRanksSet.count(10));
@@ -292,11 +286,10 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
     else if (isFlush) {
         v = FLUSH;
         score = 5 * BASE;
-        // Top 5 flush cards
         for (int i = 0; i < std::min(5, (int)flushRanks.size()); i++) {
-            score += flushRanks[i] * std::pow(100, 4-i); // 100^4, 100^3, etc.
+            score += flushRanks[i] * std::pow(100, 4-i);
         }
-        score /= 100; // Scale down to fit in int
+        score /= 100;
     }
     else if (isStraight) {
         v = STRAIGHT;
@@ -317,7 +310,6 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
     else {
         v = HIGH_CARD;
         score = 0;
-        // Use top 5 cards
         for (int i = 0; i < std::min(5, (int)h.size()); i++) {
             score += static_cast<int>(h[i].rank) * std::pow(100, 4-i);
         }
@@ -328,9 +320,25 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
     return { v, score, n[v] };
 }
 
+// --- CROSS-PLATFORM getch (Linux) ---
+inline int getch() {
+    struct termios oldt, newt;
+    int ch;
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    ch = getchar();
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    return ch;
+}
+
 inline void waitForEnter() {
     std::cout << "\n" << YELLOW << "Press ENTER to continue..." << RESET;
-    while (_getch() != 13);
+    while (true) {
+        int ch = getch();
+        if (ch == '\n' || ch == '\r') break;
+    }
 }
 
 inline void showFile(const std::string& f) {
@@ -344,13 +352,12 @@ inline void showFile(const std::string& f) {
     waitForEnter();
 }
 
-// --- DECK CLASS (FIXED: Accepts starting rank) ---
+// --- DECK CLASS ---
 class Deck {
 private:
     std::vector<Card> cards;
 public:
     Deck(int minRank = 2) {
-        // Create deck from minRank to Ace (14)
         for (int r = minRank; r <= 14; ++r)
             for (int s = 1; s <= 4; ++s)
                 cards.push_back({ static_cast<Rank>(r), static_cast<Symbol>(s) });

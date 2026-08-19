@@ -1,6 +1,6 @@
 #include "functions.hpp"
-#include <windows.h>
 #include "miniaudio.h"
+#define MINIAUDIO_IMPLEMENT
 
 void playerDrawPhase(std::vector<Card>& hand, Deck& deck, int currentTurn, int totalTurns, int potSize) {
     std::vector<bool> discard(5, false);
@@ -185,7 +185,6 @@ void playGame(ma_engine* pMainEngine) {
     srand(time(nullptr));
 
     for (int t = 1; t <= totalTurns; t++) {
-        // FIX: Create deck with startingRank based on CPU count
         Deck myDeck(startingRank);
         myDeck.shuffleDeck();
         
@@ -193,7 +192,6 @@ void playGame(ma_engine* pMainEngine) {
         std::vector<std::vector<Card>> cpuHands(numCPUs);
         std::vector<bool> inHand(numCPUs + 1, true);
         
-        // Deal
         for (int i = 0; i < 5; i++) {
             if (!myDeck.isEmpty()) pHand.push_back(myDeck.drawCard());
             for (int j = 0; j < numCPUs; j++) 
@@ -212,7 +210,6 @@ void playGame(ma_engine* pMainEngine) {
         if (handContinues && inHand[0]) 
             playerDrawPhase(pHand, myDeck, t, totalTurns, pot);
         
-        // CPU Draw
         for (int j = 0; j < numCPUs; j++) {
             if (!inHand[j+1]) continue;
             std::cout << "\nCPU " << (j + 1) << " drawing..." << std::flush;
@@ -236,13 +233,12 @@ void playGame(ma_engine* pMainEngine) {
             handContinues = bettingRound(pHand, cpuHands, inHand, pot, currentBetAmt, t, totalTurns, false);
         }
         
-        // Showdown
         clearScreen(); printHeader();
         std::cout << RED << BOLD << "\n*** SHOWDOWN (TURN " << t << ") ***" << RESET << "\n";
         std::cout << YELLOW << "POT: $" << pot << RESET << "\n\n";
         
         int bestScore = -1;
-        int winner = -1;  // FIX: Only track one winner (index: 0=player, 1+=CPU)
+        int winner = -1;
         
         if (inHand[0]) {
             HandResult pRes = evaluateHand(pHand);
@@ -252,7 +248,6 @@ void playGame(ma_engine* pMainEngine) {
             winner = 0;
         } else std::cout << "YOU (folded)\n";
         
-        // CPU hands in Yellow
         for (int j = 0; j < numCPUs; j++) {
             if (!inHand[j+1]) {
                 std::cout << YELLOW << "CPU " << (j+1) << " HAND: " << RESET << "(folded)\n";
@@ -263,15 +258,12 @@ void playGame(ma_engine* pMainEngine) {
             printHand(cpuHands[j]);
             std::cout << " >> " << CYAN << cRes.name << RESET << "\n";
             
-            // FIX: Strictly greater than - no ties allowed, first player with highest score wins
             if (cRes.totalScore > bestScore) {
                 bestScore = cRes.totalScore;
                 winner = j+1;
             }
-            // Removed: else if equal - we keep the first winner (player wins ties)
         }
         
-        // Award to single winner
         std::cout << "\n" << BOLD;
         if (winner == 0) {
             playerBalance += pot;
@@ -283,7 +275,6 @@ void playGame(ma_engine* pMainEngine) {
         }
         std::cout << RESET;
         
-        // Sounds
         ma_engine_stop(pMainEngine);
         ma_engine eng; 
         ma_engine_init(NULL, &eng);
@@ -324,12 +315,14 @@ int main() {
             else std::cout << "    " << options[i] << "\n";
         }
 
-        int key = _getch();
-        if (key == 224) {
-            key = _getch();
-            if (key == 72) choice = (choice - 1 + 4) % 4;
-            if (key == 80) choice = (choice + 1) % 4;
-        } else if (key == 13) {
+        int key = getch();
+        if (key == 27) { // ESC sequence for arrow keys
+            if (getch() == 91) {
+                int arrow = getch();
+                if (arrow == 65) choice = (choice - 1 + 4) % 4; // Up
+                if (arrow == 66) choice = (choice + 1) % 4;     // Down
+            }
+        } else if (key == '\n' || key == '\r') {
             if      (choice == 0) playGame(&engine1);
             else if (choice == 1) showFile("rules.txt");
             else if (choice == 2) showFile("points.txt");
