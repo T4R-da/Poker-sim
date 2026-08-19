@@ -1,6 +1,6 @@
-#include "functions.hpp"
+#define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
-#define MINIAUDIO_IMPLEMENT
+#include "functions.hpp"
 
 void playerDrawPhase(std::vector<Card>& hand, Deck& deck, int currentTurn, int totalTurns, int potSize) {
     std::vector<bool> discard(5, false);
@@ -12,7 +12,7 @@ void playerDrawPhase(std::vector<Card>& hand, Deck& deck, int currentTurn, int t
         std::cout << BOLD << "YOUR HAND:\n" << RESET;
         printHand(hand, discard);
         std::cout << "\n  (1)       (2)       (3)       (4)       (5)\n";
-        std::cout << "\nNumbers to toggle DISCARD, ENTER to DRAW.\n";
+        std::cout << "\nEnter card numbers (1-5) to toggle discard, or press ENTER to confirm draw.\n";
         
         int currentDiscards = std::count(discard.begin(), discard.end(), true);
         if (currentDiscards == 4) {
@@ -61,7 +61,7 @@ bool bettingRound(std::vector<Card>& pHand, std::vector<std::vector<Card>>& cpuH
             continue;
         }
         
-        if (current == 0) { // Player
+        if (current == 0) {
             clearScreen();
             printHeader();
             std::cout << CYAN << BOLD << "TURN " << turnNum << " OF " << totalTurns 
@@ -92,19 +92,18 @@ bool bettingRound(std::vector<Card>& pHand, std::vector<std::vector<Card>>& cpuH
                 activeCount--;
                 sleepMs(1000);
                 return (activeCount > 1);
-            }
-            else if (cmd == 'C') {
-                if (betToCall == 0) std::cout << GREEN << "You check." << RESET << "\n";
-                else {
+            } else if (cmd == 'C') {
+                if (betToCall == 0) {
+                    std::cout << GREEN << "You check." << RESET << "\n";
+                } else {
                     std::cout << GREEN << "You call $" << betToCall << "." << RESET << "\n";
                     pot += betToCall;
                     playerBalance -= betToCall;
                 }
                 sleepMs(800);
-            }
-            else if (cmd == 'R') {
+            } else if (cmd == 'R') {
                 if (raiseCount >= MAX_RAISES) {
-                    std::cout << RED << "Max 3 raises! Calling instead." << RESET << "\n";
+                    std::cout << RED << "Max raises reached. Calling instead." << RESET << "\n";
                     if (betToCall > 0) { pot += betToCall; playerBalance -= betToCall; }
                     sleepMs(1000);
                 } else {
@@ -120,29 +119,31 @@ bool bettingRound(std::vector<Card>& pHand, std::vector<std::vector<Card>>& cpuH
                         betToCall = newBet;
                         lastRaiser = 0;
                         raiseCount++;
-                        std::cout << YELLOW << "You raise to $" << betToCall << "! (" << raiseCount << "/3)" << RESET << "\n";
+                        std::cout << YELLOW << "You raise to $" << betToCall << ".\n" << RESET;
                     } else {
-                        std::cout << "Invalid. You call $" << betToCall << ".\n";
-                        pot += betToCall; playerBalance -= betToCall;
+                        std::cout << "Invalid input. Calling $" << betToCall << ".\n";
+                        pot += betToCall; 
+                        playerBalance -= betToCall;
                     }
                     sleepMs(800);
                 }
             }
-        } 
-        else { // CPU
+        } else {
             int cpuIdx = current - 1;
-            std::cout << "\nCPU " << (cpuIdx + 1) << " thinking..." << std::flush;
+            std::cout << "\nCPU " << (cpuIdx + 1) << " processing..." << std::flush;
             sleepRandom();
             
             Decision d = cpuDecideBet(cpuHands[cpuIdx], betToCall, raiseCount, MAX_RAISES);
             
-            if (d.action == BetAction::RAISE && raiseCount >= MAX_RAISES) 
+            if (d.action == BetAction::RAISE && raiseCount >= MAX_RAISES) {
                 d = {BetAction::CALL, 0};
+            }
             
             switch (d.action) {
                 case BetAction::FOLD:
                     std::cout << RED << " CPU " << (cpuIdx + 1) << " folds." << RESET << "\n";
-                    active[current] = false; activeCount--;
+                    active[current] = false; 
+                    activeCount--;
                     break;
                 case BetAction::CHECK:
                     std::cout << CYAN << " CPU " << (cpuIdx + 1) << " checks." << RESET << "\n";
@@ -156,8 +157,7 @@ bool bettingRound(std::vector<Card>& pHand, std::vector<std::vector<Card>>& cpuH
                     betToCall = d.amount;
                     pot += betToCall;
                     lastRaiser = current;
-                    std::cout << YELLOW << " CPU " << (cpuIdx + 1) << " raises to $" << betToCall 
-                              << "! (" << raiseCount << "/3)" << RESET << "\n";
+                    std::cout << YELLOW << " CPU " << (cpuIdx + 1) << " raises to $" << betToCall << ".\n" << RESET;
                     break;
             }
             sleepMs(1000);
@@ -171,13 +171,15 @@ bool bettingRound(std::vector<Card>& pHand, std::vector<std::vector<Card>>& cpuH
 }
 
 void playGame(ma_engine* pMainEngine) {
-    clearScreen(); printHeader();
+    clearScreen(); 
+    printHeader();
     
     int totalTurns;
     std::cout << CYAN << "How many turns? (1-5): " << RESET;
     while (!(std::cin >> totalTurns) || totalTurns < 1 || totalTurns > 5) {
-        std::cin.clear(); std::cin.ignore(1000, '\n');
-        std::cout << RED << "Invalid. Enter 1-5: " << RESET;
+        std::cin.clear(); 
+        std::cin.ignore(1000, '\n');
+        std::cout << RED << "Invalid input. Enter 1-5: " << RESET;
     }
     std::cin.ignore(1000, '\n');
     
@@ -194,21 +196,23 @@ void playGame(ma_engine* pMainEngine) {
         
         for (int i = 0; i < 5; i++) {
             if (!myDeck.isEmpty()) pHand.push_back(myDeck.drawCard());
-            for (int j = 0; j < numCPUs; j++) 
+            for (int j = 0; j < numCPUs; j++) {
                 if (!myDeck.isEmpty()) cpuHands[j].push_back(myDeck.drawCard());
+            }
         }
 
         int pot = (numCPUs + 1) * 10;
         playerBalance -= 10;
         int currentBetAmt = 0;
         
-        std::cout << "\nTurn " << t << "... Everyone antes $10\n";
+        std::cout << "\nTurn " << t << "... Ante $10 collected.\n";
         sleepMs(1500);
         
         bool handContinues = bettingRound(pHand, cpuHands, inHand, pot, currentBetAmt, t, totalTurns, true);
         
-        if (handContinues && inHand[0]) 
+        if (handContinues && inHand[0]) {
             playerDrawPhase(pHand, myDeck, t, totalTurns, pot);
+        }
         
         for (int j = 0; j < numCPUs; j++) {
             if (!inHand[j+1]) continue;
@@ -233,7 +237,8 @@ void playGame(ma_engine* pMainEngine) {
             handContinues = bettingRound(pHand, cpuHands, inHand, pot, currentBetAmt, t, totalTurns, false);
         }
         
-        clearScreen(); printHeader();
+        clearScreen(); 
+        printHeader();
         std::cout << RED << BOLD << "\n*** SHOWDOWN (TURN " << t << ") ***" << RESET << "\n";
         std::cout << YELLOW << "POT: $" << pot << RESET << "\n\n";
         
@@ -242,11 +247,14 @@ void playGame(ma_engine* pMainEngine) {
         
         if (inHand[0]) {
             HandResult pRes = evaluateHand(pHand);
-            std::cout << "YOUR HAND: "; printHand(pHand);
+            std::cout << "YOUR HAND: "; 
+            printHand(pHand);
             std::cout << " >> " << CYAN << pRes.name << RESET << "\n";
             bestScore = pRes.totalScore;
             winner = 0;
-        } else std::cout << "YOU (folded)\n";
+        } else {
+            std::cout << "YOU (folded)\n";
+        }
         
         for (int j = 0; j < numCPUs; j++) {
             if (!inHand[j+1]) {
@@ -275,17 +283,9 @@ void playGame(ma_engine* pMainEngine) {
         }
         std::cout << RESET;
         
-        ma_engine_stop(pMainEngine);
-        ma_engine eng; 
-        ma_engine_init(NULL, &eng);
-        ma_engine_play_sound(&eng, (winner == 0) ? "win.wav" : "loss.wav", NULL);
-        sleepMs(4000);
-        ma_engine_uninit(&eng);
-        ma_engine_start(pMainEngine);
-        
-        if (t < totalTurns) {
-            std::cout << CYAN << "\nPrepare for Turn " << (t + 1) << "..." << RESET << "\n";
-            sleepMs(2000);
+        const char* outcomeSound = (winner == 0) ? "win.wav" : "loss.wav";
+        if (ma_engine_play_sound(pMainEngine, outcomeSound, NULL) != MA_SUCCESS) {
+            ma_engine_play_sound(pMainEngine, (winner == 0) ? "src/win.wav" : "src/loss.wav", NULL);
         }
     }
     
@@ -294,33 +294,47 @@ void playGame(ma_engine* pMainEngine) {
 }
 
 int main() {
-    bootingSequence();
     ma_engine engine1;
-    if (ma_engine_init(NULL, &engine1) != MA_SUCCESS) return -1;
+    if (ma_engine_init(NULL, &engine1) != MA_SUCCESS) {
+        std::cerr << "Failed to initialize miniaudio engine.\n";
+        return -1;
+    }
     
     ma_sound bgSound;
-    if (ma_sound_init_from_file(&engine1, "sound.wav", MA_SOUND_FLAG_STREAM, NULL, NULL, &bgSound) == MA_SUCCESS) {
+    ma_result bgResult = ma_sound_init_from_file(&engine1, "sound.wav", MA_SOUND_FLAG_STREAM, NULL, NULL, &bgSound);
+
+    if (bgResult != MA_SUCCESS) {
+        bgResult = ma_sound_init_from_file(&engine1, "src/sound.wav", MA_SOUND_FLAG_STREAM, NULL, NULL, &bgSound);
+    }
+
+    if (bgResult == MA_SUCCESS) {
         ma_sound_set_looping(&bgSound, true);
         ma_sound_start(&bgSound);
+    } else {
+        std::cerr << "[Warning] Sound engine failed to load sound.wav\n";
     }
 
     int choice = 0;
     std::string options[] = { "Start Game", "Rules", "Hand Rankings", "Quit" };
 
     while (true) {
-        clearScreen(); printHeader();
+        clearScreen(); 
+        printHeader();
         std::cout << YELLOW << "BALANCE: $" << playerBalance << RESET << "\n\n";
         for (int i = 0; i < 4; i++) {
-            if (i == choice) std::cout << GREEN << BOLD << "  > " << options[i] << " <" << RESET << "\n";
-            else std::cout << "    " << options[i] << "\n";
+            if (i == choice) {
+                std::cout << GREEN << BOLD << "  > " << options[i] << " <" << RESET << "\n";
+            } else {
+                std::cout << "    " << options[i] << "\n";
+            }
         }
 
         int key = getch();
-        if (key == 27) { // ESC sequence for arrow keys
+        if (key == 27) { 
             if (getch() == 91) {
                 int arrow = getch();
-                if (arrow == 65) choice = (choice - 1 + 4) % 4; // Up
-                if (arrow == 66) choice = (choice + 1) % 4;     // Down
+                if (arrow == 65) choice = (choice - 1 + 4) % 4; 
+                if (arrow == 66) choice = (choice + 1) % 4;     
             }
         } else if (key == '\n' || key == '\r') {
             if      (choice == 0) playGame(&engine1);

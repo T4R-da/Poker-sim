@@ -12,10 +12,13 @@
 #include <map>
 #include <set>
 #include <cstdlib>
+#include <cmath>
 #include <termios.h>
 #include <unistd.h>
 
-// ANSI Colors
+#include "miniaudio.h"
+
+// ANSI Color definitions
 #define RESET   "\033[0m"
 #define RED     "\033[31m"
 #define CYAN    "\033[36m"
@@ -28,7 +31,7 @@ inline int playerBalance = 1000;
 inline int currentBet = 0;
 inline int startingRank = 2; 
 inline int numCPUs = 1;
-const int MAX_RAISES = 3; // Betting cap
+const int MAX_RAISES = 3; 
 
 enum class Rank   { TWO = 2, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING, ACE };
 enum class Symbol { SPADES = 1, CLUBS = 2, DIAMONDS = 3, HEART = 4 };
@@ -41,35 +44,37 @@ enum HandValue {
 
 struct HandResult {
     HandValue value;
-    int       totalScore;
+    int totalScore;
     std::string name;
 };
 
 struct Card {
-    Rank   rank;
+    Rank rank;
     Symbol symbol;
     void print() const {
         std::string r[] = {"","","2","3","4","5","6","7","8","9","10","J","Q","K","A"};
         std::string s[] = {"","S","C","D","H"};
-        if (symbol == Symbol::HEART || symbol == Symbol::DIAMONDS) std::cout << RED;
-        else std::cout << CYAN;
+        if (symbol == Symbol::HEART || symbol == Symbol::DIAMONDS) {
+            std::cout << RED;
+        } else {
+            std::cout << CYAN;
+        }
         std::cout << "[" << r[static_cast<int>(rank)] << s[static_cast<int>(symbol)] << "]" << RESET << " ";
     }
 };
 
-// Forward declaration
+// Forward Declarations
 HandResult evaluateHand(const std::vector<Card>& hand);
+void playGame(ma_engine* pMainEngine);
 
-// --- TIMING UTILS ---
 inline void sleepMs(int ms) {
     std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
 inline void sleepRandom() {
-    sleepMs(1000 + (rand() % 1000)); // 1-2 seconds
+    sleepMs(500 + (rand() % 500));
 }
 
-// --- BETTING SYSTEM ---
 enum class BetAction { FOLD, CHECK, CALL, RAISE };
 
 struct Decision {
@@ -93,12 +98,10 @@ inline Decision cpuDecideBet(const std::vector<Card>& hand, int currentBetToCall
     } else {
         if (score < 1000000 && currentBetToCall > 25) {
             return (luck < 15) ? Decision{BetAction::CALL, 0} : Decision{BetAction::FOLD, 0};
-        }
-        else if (score > 30000000) {
+        } else if (score > 30000000) {
             if (canRaise && luck < 70) return {BetAction::RAISE, currentBetToCall * 2 + (rand() % 30)};
             return {BetAction::CALL, 0};
-        }
-        else if (score > 10000000 || currentBetToCall < 30) {
+        } else if (score > 10000000 || currentBetToCall < 30) {
             if (canRaise && luck < 30 && score > 15000000) return {BetAction::RAISE, currentBetToCall + 25};
             return {BetAction::CALL, 0};
         }
@@ -106,7 +109,7 @@ inline Decision cpuDecideBet(const std::vector<Card>& hand, int currentBetToCall
     }
 }
 
-// --- VISUALS (ASCII ART) ---
+// RESTORED ASCII BANNER
 inline void printHeader() {
     std::cout << MAGENTA << BOLD;
     std::cout << "  ____     ____    _    ____  ____   ____      ____   ___   _  __ _____ ____  \n";
@@ -121,20 +124,6 @@ inline void clearScreen() {
     std::cout << "\033[2J\033[H";
 }
 
-inline void bootingSequence() {
-    clearScreen();
-    std::cout << CYAN << BOLD << "[SYSTEM]: INITIALIZING ASSETS..." << RESET << "\n";
-    std::cout << "[";
-    for(int i=0; i<30; i++) {
-        std::cout << "#";
-        std::this_thread::sleep_for(std::chrono::milliseconds(30));
-    }
-    std::cout << "] 100%\n";
-    std::cout << GREEN << "ASSETS LOADED." << RESET << "\n";
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-}
-
-// --- CARD DISPLAY ---
 inline void printHand(const std::vector<Card>& hand, const std::vector<bool>& discard = {}) {
     for (const auto& c : hand) {
         c.print();
@@ -155,38 +144,17 @@ inline void printHand(const std::vector<Card>& hand, const std::vector<bool>& di
     }
 }
 
-// --- GAME SETUP ---
 inline void chooseOpponents() {
     std::cout << CYAN << "\nHow many CPUs do you want to play against? (1-4): " << RESET;
     while (!(std::cin >> numCPUs) || numCPUs < 1 || numCPUs > 4) {
-        std::cin.clear(); std::cin.ignore(1000, '\n');
+        std::cin.clear(); 
+        std::cin.ignore(1000, '\n');
         std::cout << RED << "Select 1 to 4: " << RESET;
     }
     startingRank = 10 - numCPUs;
     std::cin.ignore(1000, '\n');
 }
 
-inline void placeBet() {
-    if (playerBalance <= 0) {
-        std::cout << RED << "\n[!] BANKRUPT! Dealer grants $200 charity.\n" << RESET;
-        playerBalance = 200;
-    }
-    while (true) {
-        std::cout << GREEN << BOLD << "\nCURRENT BALANCE: $" << playerBalance << RESET << "\n";
-        std::cout << "Enter your bet amount: $";
-        if (!(std::cin >> currentBet)) {
-            std::cin.clear(); std::cin.ignore(1000, '\n');
-            std::cout << RED << "Invalid input." << RESET << "\n";
-        } else if (currentBet <= 0 || currentBet > playerBalance) {
-            std::cout << RED << "Invalid amount." << RESET << "\n";
-        } else { 
-            std::cin.ignore(1000, '\n'); 
-            break; 
-        }
-    }
-}
-
-// --- HAND EVALUATION ---
 inline HandResult evaluateHand(const std::vector<Card>& hand) {
     std::vector<Card> h = hand;
     std::sort(h.begin(), h.end(), [](const Card& a, const Card& b){ return a.rank > b.rank; });
@@ -196,7 +164,7 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
     for (const auto& c : h) { rc[c.rank]++; sc[c.symbol]++; }
     
     bool isFlush = false;
-    Symbol flushSuit;
+    Symbol flushSuit = Symbol::SPADES;
     for (auto const& [suit, cnt] : sc) {
         if (cnt >= 5) {
             isFlush = true;
@@ -252,8 +220,7 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
             } else if (rankVal > pair2Rank) {
                 pair2Rank = rankVal;
             }
-        }
-        else if (count == 1) {
+        } else if (count == 1) {
             kickers.push_back(rankVal);
         }
     }
@@ -261,7 +228,7 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
     
     HandValue v = HIGH_CARD;
     int score = 0;
-    const int BASE = 100000000; // 10^8
+    const int BASE = 100000000;
     
     bool isRoyal = (isFlush && isStraight && straightHigh == 14 && 
                     uniqueRanksSet.count(13) && uniqueRanksSet.count(12) && 
@@ -270,47 +237,44 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
     if (isRoyal) {
         v = ROYAL_FLUSH;
         score = 9 * BASE;
-    }
-    else if (isFlush && isStraight) {
+    } else if (isFlush && isStraight) {
         v = STRAIGHT_FLUSH;
         score = 8 * BASE + straightHigh;
-    }
-    else if (quads) {
+    } else if (quads) {
         v = FOUR_KIND;
-        score = 7 * BASE + quadRank * 10000 + kickers[0];
-    }
-    else if (trips && pairs) {
+        score = 7 * BASE + quadRank * 10000 + (kickers.empty() ? 0 : kickers[0]);
+    } else if (trips && pairs) {
         v = FULL_HOUSE;
         score = 6 * BASE + tripRank * 10000 + pair1Rank;
-    }
-    else if (isFlush) {
+    } else if (isFlush) {
         v = FLUSH;
         score = 5 * BASE;
-        for (int i = 0; i < std::min(5, (int)flushRanks.size()); i++) {
+        for (int i = 0; i < std::min<int>(5, flushRanks.size()); i++) {
             score += flushRanks[i] * std::pow(100, 4-i);
         }
         score /= 100;
-    }
-    else if (isStraight) {
+    } else if (isStraight) {
         v = STRAIGHT;
         score = 4 * BASE + straightHigh;
-    }
-    else if (trips) {
+    } else if (trips) {
         v = THREE_KIND;
-        score = 3 * BASE + tripRank * 1000000 + kickers[0] * 10000 + kickers[1] * 100 + kickers[2];
-    }
-    else if (pairs >= 2) {
+        score = 3 * BASE + tripRank * 1000000 + 
+                (kickers.size() > 0 ? kickers[0] * 10000 : 0) + 
+                (kickers.size() > 1 ? kickers[1] * 100 : 0) + 
+                (kickers.size() > 2 ? kickers[2] : 0);
+    } else if (pairs >= 2) {
         v = TWO_PAIR;
-        score = 2 * BASE + pair1Rank * 1000000 + pair2Rank * 10000 + kickers[0];
-    }
-    else if (pairs == 1) {
+        score = 2 * BASE + pair1Rank * 1000000 + pair2Rank * 10000 + (kickers.empty() ? 0 : kickers[0]);
+    } else if (pairs == 1) {
         v = PAIR;
-        score = 1 * BASE + pair1Rank * 1000000 + kickers[0] * 10000 + kickers[1] * 100 + kickers[2];
-    }
-    else {
+        score = 1 * BASE + pair1Rank * 1000000 + 
+                (kickers.size() > 0 ? kickers[0] * 10000 : 0) + 
+                (kickers.size() > 1 ? kickers[1] * 100 : 0) + 
+                (kickers.size() > 2 ? kickers[2] : 0);
+    } else {
         v = HIGH_CARD;
         score = 0;
-        for (int i = 0; i < std::min(5, (int)h.size()); i++) {
+        for (int i = 0; i < std::min<int>(5, h.size()); i++) {
             score += static_cast<int>(h[i].rank) * std::pow(100, 4-i);
         }
         score /= 100;
@@ -320,7 +284,6 @@ inline HandResult evaluateHand(const std::vector<Card>& hand) {
     return { v, score, n[v] };
 }
 
-// --- CROSS-PLATFORM getch (Linux) ---
 inline int getch() {
     struct termios oldt, newt;
     int ch;
@@ -341,26 +304,39 @@ inline void waitForEnter() {
     }
 }
 
-inline void showFile(const std::string& f) {
-    clearScreen(); printHeader();
-    std::ifstream file(f);
+inline void showFile(const std::string& fileName) {
+    clearScreen(); 
+    printHeader();
+    
+    // Check local directory first, fallback to src/
+    std::string fullPath = fileName;
+    std::ifstream file(fullPath);
+    
+    if (!file.is_open()) {
+        fullPath = "src/" + fileName;
+        file.open(fullPath);
+    }
+    
     if (file.is_open()) {
-        std::string l;
-        while (std::getline(file, l)) std::cout << l << "\n";
+        std::string line;
+        while (std::getline(file, line)) std::cout << line << "\n";
         file.close();
-    } else std::cout << RED << "File Error." << RESET << "\n";
+    } else {
+        std::cout << RED << "Error: Could not open file " << fileName << RESET << "\n";
+    }
     waitForEnter();
 }
 
-// --- DECK CLASS ---
 class Deck {
 private:
     std::vector<Card> cards;
 public:
     Deck(int minRank = 2) {
-        for (int r = minRank; r <= 14; ++r)
-            for (int s = 1; s <= 4; ++s)
+        for (int r = minRank; r <= 14; ++r) {
+            for (int s = 1; s <= 4; ++s) {
                 cards.push_back({ static_cast<Rank>(r), static_cast<Symbol>(s) });
+            }
+        }
     }
     void shuffleDeck() {
         std::random_device rd; 
@@ -368,7 +344,7 @@ public:
         std::shuffle(cards.begin(), cards.end(), g);
     }
     Card drawCard() { 
-        if(cards.empty()) return {Rank::TWO, Symbol::SPADES};
+        if (cards.empty()) return {Rank::TWO, Symbol::SPADES};
         Card c = cards.back(); 
         cards.pop_back(); 
         return c; 
@@ -377,12 +353,13 @@ public:
     size_t remaining() const { return cards.size(); }
 };
 
-// --- CPU LOGIC ---
 inline std::vector<bool> cpuDecide1(const std::vector<Card>& hand) {
     std::map<Rank, int> rc;
     for (const auto& c : hand) rc[c.rank]++;
     std::vector<bool> d(5, false);
-    for (int i=0; i<5; i++) if (rc[hand[i].rank] < 2) d[i] = true;
+    for (int i = 0; i < 5; i++) {
+        if (rc[hand[i].rank] < 2) d[i] = true;
+    }
     return d;
 }
 
